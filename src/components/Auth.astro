@@ -96,12 +96,18 @@
                 });
                 if (error) throw error;
             } else {
-                const { error } = await supabase.auth.signUp({
+                const { data, error } = await supabase.auth.signUp({
                     email,
                     password,
                 });
                 if (error) throw error;
-                alert("Check your email for the confirmation link!");
+
+                // If email verification is disabled, we get a session immediately
+                if (data.session) {
+                    // Auto-login successful
+                } else if (data.user && !data.session) {
+                    alert("Check your email for the confirmation link!");
+                }
             }
             // Reload to update state
             window.location.reload();
