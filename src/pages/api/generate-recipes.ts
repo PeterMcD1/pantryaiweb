@@ -38,13 +38,19 @@ export const POST: APIRoute = async ({ request }) => {
 
     Please generate 3 creative and healthy recipes that I can make with these ingredients. 
     You can assume I have basic staples like oil, salt, pepper, and water.
-    For each recipe, include:
-    1. Recipe Name
-    2. Approximate Calories and Macros (Protein, Carbs, Fat) per serving
-    3. Ingredients list
-    4. Brief instructions
-
-    Format the output nicely in Markdown.
+    
+    IMPORTANT: Return ONLY a raw JSON array of objects. Do not wrap it in markdown code blocks.
+    
+    The JSON structure must be:
+    [
+      {
+        "name": "Recipe Name",
+        "calories": "Approx calories",
+        "macros": "Protein/Carbs/Fat",
+        "ingredients": ["Item 1", "Item 2"],
+        "instructions": ["Step 1", "Step 2"]
+      }
+    ]
   `;
 
     try {
@@ -63,8 +69,7 @@ export const POST: APIRoute = async ({ request }) => {
         const customStream = new ReadableStream({
             async start(controller) {
                 console.log('API: Starting stream to client');
-                // Send an initial "warming up" packet
-                controller.enqueue(new TextEncoder().encode("**Thinking...**\n\n"));
+                // Removed manual 'Thinking...' packet to keep JSON clean.
 
                 try {
                     for await (const chunk of stream) {

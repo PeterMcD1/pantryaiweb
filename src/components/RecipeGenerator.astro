@@ -20,7 +20,6 @@
 </div>
 
 <script>
-    import { marked } from "marked"; // We need a markdown parser for nice display
     import { supabase } from "../lib/supabaseClient";
 
     const generateBtn = document.getElementById(
@@ -35,7 +34,7 @@
         setLoading(true);
         output.innerHTML = "";
         output.classList.add("hidden");
-        output.classList.remove("error-msg"); // Clear previous error styles
+        output.classList.remove("error-msg");
 
         try {
             const {
@@ -56,76 +55,122 @@
 
             // 2. Call API
             console.log("Client: Sending request to /api/generate-recipes");
-            let response;
-            try {
-                response = await fetch("/api/generate-recipes", {
-                    method: "POST",
-                    headers: {
-                        "Content-Type": "application/json",
-                    },
-                    body: JSON.stringify({ items }),
-                });
-            } catch (netErr) {
-                console.error("Client: Network Error calling API:", netErr);
-                throw new Error("Network error calling API");
-            }
-
-            console.log("Client: Response received. Status:", response.status);
-
-            if (!response.ok) {
-                let errorMsg = "Failed to generate recipes";
-                try {
-                    const errorData = await response.json();
-                    errorMsg = errorData.error || errorMsg;
-                } catch (e) {
-                    // If response isn't JSON, try to get text
-                    try {
-                        const rawText = await response.text();
-                        if (rawText)
-                            errorMsg += `: ${rawText.substring(0, 150)}`;
-                    } catch (txtErr) {
-                        // ignore
-                    }
-                }
-                throw new Error(errorMsg);
-            }
-
-            if (!response.body)
-                throw new Error("No response body received from server");
-
             output.classList.remove("hidden");
+            output.innerHTML = '<div class="thinking">Thinking...</div>';
+
+            const response = await fetch("/api/generate-recipes", {
+                method: "POST",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({ items }),
+            });
+
+            if (!response.ok) throw new Error("API Request Failed");
+            if (!response.body) throw new Error("No response body");
+
             const reader = response.body.getReader();
             const decoder = new TextDecoder();
-            let markdownText = "";
-            console.log("Client: Starting to read stream");
+
+            let buffer = "";
+            let renderedCount = 0;
+            const recipes: any[] = [];
 
             while (true) {
                 const { done, value } = await reader.read();
-                if (done) {
-                    console.log("Client: Stream done");
-                    break;
-                }
+                if (done) break;
 
                 const chunk = decoder.decode(value, { stream: true });
-                console.log("Client: Chunk received (len):", chunk.length);
-                markdownText += chunk;
+                buffer += chunk;
 
-                // Render markdown
-                output.innerHTML = parseMarkdown(markdownText);
+                // Attempt to find complete objects in the array stream
+                // Matches content between { and } that looks like an object
+                // We assume objects are comma separated
+                const objectMatches = buffer.match(
+                    /\{[\s\S]*?\}(?=,\s*|\s*\])/g,
+                );
+
+                if (objectMatches && objectMatches.length > renderedCount) {
+                    // We found new objects!
+                    if (renderedCount === 0) {
+                        output.innerHTML = ""; // Clear "Thinking..."
+                    }
+
+                    for (let i = renderedCount; i < objectMatches.length; i++) {
+                        try {
+                            const recipe = JSON.parse(objectMatches[i]);
+                            output.appendChild(createRecipeCard(recipe));
+                            recipes.push(recipe);
+                            renderedCount++;
+                        } catch (e) {
+                            // Incomplete or malformed JSON chunk, wait for more data
+                            console.warn("Skipping incomplete JSON chunk");
+                        }
+                    }
+                }
+            }
+
+            // Final safety check: if we somehow missed everything (e.g. single giant chunk)
+            if (renderedCount === 0 && buffer.length > 0) {
+                try {
+                    const allRecipes = JSON.parse(buffer);
+                    output.innerHTML = "";
+                    allRecipes.forEach((r: any) =>
+                        output.appendChild(createRecipeCard(r)),
+                    );
+                } catch (e) {
+                    console.error("Final parse failed", e);
+                }
             }
         } catch (err: any) {
-            console.error("Recipe generation error:", err);
-            output.classList.remove("hidden");
-            output.classList.add("error-msg");
-            output.innerHTML = `<div class="error-content">
-        <strong>Error:</strong> ${err.message || "Something went wrong while generating recipes."}
-        <br/><br/>
-        Please check your network connection and API keys.
-      </div>`;
+            console.error("Error:", err);
+            output.innerHTML = `<div class="error-content">Error: ${err.message}</div>`;
         } finally {
             setLoading(false);
         }
     });
+
+    function createRecipeCard(recipe: any) {
+        const details = document.createElement("details");
+        const summary = document.createElement("summary");
+
+        const h3 = document.createElement("h3");
+        h3.textContent = recipe.name;
+
+        const p = document.createElement("p");
+        p.innerHTML = `<strong>Calories:</strong> ${recipe.calories} | <strong>Macros:</strong> ${recipe.macros}`;
+
+        summary.appendChild(h3);
+        summary.appendChild(p);
+        details.appendChild(summary);
+
+        const content = document.createElement("div");
+
+        const h4Ing = document.createElement("h4");
+        h4Ing.textContent = "Ingredients";
+        content.appendChild(h4Ing);
+
+        const ul = document.createElement("ul");
+        recipe.ingredients.forEach((ing: string) => {
+            const li = document.createElement("li");
+            li.textContent = ing;
+            ul.appendChild(li);
+        });
+        content.appendChild(ul);
+
+        const h4Inst = document.createElement("h4");
+        h4Inst.textContent = "Instructions";
+        content.appendChild(h4Inst);
+
+        const ol = document.createElement("ol");
+        recipe.instructions.forEach((inst: string) => {
+            const li = document.createElement("li");
+            li.textContent = inst;
+            ol.appendChild(li);
+        });
+        content.appendChild(ol);
+
+        details.appendChild(content);
+        return details;
+    }
 
     function setLoading(isLoading: boolean) {
         if (isLoading) {
@@ -138,30 +183,6 @@
             loader.classList.add("hidden");
         }
     }
-
-    // Simple Markdown parser to avoid heavy dependency if strict performance is key
-    // But user said "super performative", a 20kb lib is usually fine.
-    // For now, I'll use a very basic replacement or assume I can install 'marked'
-    // I will assume I need to install 'marked'
-    function parseMarkdown(text: string) {
-        // @ts-ignore
-        if (typeof window.marked !== "undefined")
-            return window.marked.parse(text);
-
-        // Fallback simple formatter
-        return text
-            .replace(/\n/g, "<br>")
-            .replace(/\*\*(.*?)\*\*/g, "<strong>$1</strong>")
-            .replace(/# (.*?)(<br>|$)/g, "<h1>$1</h1>")
-            .replace(/## (.*?)(<br>|$)/g, "<h2>$1</h2>");
-    }
-</script>
-
-<script>
-    // Dynamically load marked for client-side rendering
-    const script = document.createElement("script");
-    script.src = "https://cdn.jsdelivr.net/npm/marked/marked.min.js";
-    document.head.appendChild(script);
 </script>
 
 <style>
@@ -179,6 +200,10 @@
         /* min-height: 400px; */
         position: sticky;
         top: 2rem;
+    }
+
+    .hidden {
+        display: none !important;
     }
 
     h2 {
@@ -264,5 +289,90 @@
         padding: 1rem;
         border-radius: 8px;
         border: 1px solid rgba(255, 0, 0, 0.2);
+    }
+
+    .thinking {
+        color: #a0a0a0;
+        font-style: italic;
+        text-align: center;
+        padding: 1rem;
+    }
+
+    /* Recipe Card Styles */
+    .recipe-output :global(details) {
+        background: rgba(255, 255, 255, 0.03);
+        border: 1px solid rgba(255, 255, 255, 0.1);
+        border-radius: 12px;
+        margin-bottom: 1rem;
+        overflow: hidden;
+        transition: all 0.3s ease;
+    }
+
+    .recipe-output :global(details[open]) {
+        background: rgba(255, 255, 255, 0.07);
+        outline: 1px solid rgba(136, 58, 234, 0.5);
+    }
+
+    .recipe-output :global(summary) {
+        padding: 1rem 1.5rem;
+        cursor: pointer;
+        list-style: none; /* Hide default arrow */
+        position: relative;
+    }
+
+    .recipe-output :global(summary::-webkit-details-marker) {
+        display: none;
+    }
+
+    .recipe-output :global(summary:hover) {
+        background: rgba(255, 255, 255, 0.03);
+    }
+
+    /* Custom Arrow */
+    .recipe-output :global(summary::after) {
+        content: "+";
+        position: absolute;
+        right: 1.5rem;
+        top: 50%;
+        transform: translateY(-50%);
+        font-size: 1.5rem;
+        font-weight: 300;
+        color: #a0a0a0;
+        transition: transform 0.3s;
+    }
+
+    .recipe-output :global(details[open] summary::after) {
+        transform: translateY(-50%) rotate(45deg);
+    }
+
+    .recipe-output :global(summary h3) {
+        margin: 0 0 0.5rem 0;
+        color: white;
+        font-size: 1.2rem;
+    }
+
+    .recipe-output :global(summary p) {
+        margin: 0;
+        color: #a0aec0;
+        font-size: 0.9rem;
+    }
+
+    /* Content styling inside details (that isn't summary) */
+    .recipe-output :global(details > *:not(summary)) {
+        padding: 0 1.5rem 1.5rem 1.5rem;
+        border-top: 1px solid rgba(255, 255, 255, 0.05);
+        margin-top: 0.5rem;
+        animation: slideDown 0.3s ease-out;
+    }
+
+    @keyframes slideDown {
+        from {
+            opacity: 0;
+            transform: translateY(-10px);
+        }
+        to {
+            opacity: 1;
+            transform: translateY(0);
+        }
     }
 </style>

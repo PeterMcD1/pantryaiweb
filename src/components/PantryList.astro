@@ -117,6 +117,7 @@
 </script>
 
 <style>
+    /* Container styles (static) */
     .pantry-list-container {
         background: rgba(255, 255, 255, 0.03);
         border-radius: 12px;
@@ -140,7 +141,8 @@
         overflow-y: auto;
     }
 
-    .pantry-item {
+    /* Dynamic Content Styles */
+    .pantry-list :global(.pantry-item) {
         display: flex;
         justify-content: space-between;
         align-items: center;
@@ -161,68 +163,71 @@
         }
     }
 
-    .pantry-item:hover {
+    .pantry-list :global(.pantry-item:hover) {
         background: rgba(255, 255, 255, 0.03);
     }
 
-    .item-name {
+    .pantry-list :global(.item-name) {
         font-weight: 500;
         font-size: 1.1rem;
         display: block;
         margin-bottom: 0.25rem;
     }
 
-    .item-details {
+    .pantry-list :global(.item-details) {
         display: flex;
         gap: 0.5rem;
         font-size: 0.85rem;
     }
 
-    .tag {
+    .pantry-list :global(.tag) {
         padding: 0.1rem 0.5rem;
         border-radius: 4px;
         background: rgba(255, 255, 255, 0.1);
         color: #ccc;
     }
 
-    .tag.qty {
+    .pantry-list :global(.tag.qty) {
         background: #2d3748;
         color: #a0aec0;
     }
 
-    .tag.date.urgent {
+    .pantry-list :global(.tag.date.urgent) {
         background: rgba(237, 137, 54, 0.2);
         color: #ed8936;
     }
 
-    .tag.date.expired {
+    .pantry-list :global(.tag.date.expired) {
         background: rgba(245, 101, 101, 0.2);
         color: #f56565;
     }
 
-    .tag.date.ok {
+    .pantry-list :global(.tag.date.ok) {
         background: rgba(72, 187, 120, 0.2);
         color: #48bb78;
     }
 
-    .delete-btn {
-        background: none;
+    .pantry-list :global(.delete-btn) {
+        background: transparent;
         border: none;
         color: #718096;
         cursor: pointer;
         padding: 0.5rem;
         border-radius: 6px;
         transition: all 0.2s;
+        display: flex;
+        align-items: center;
+        justify-content: center;
     }
 
-    .delete-btn:hover {
+    .pantry-list :global(.delete-btn:hover) {
         color: #f56565;
         background: rgba(245, 101, 101, 0.1);
     }
 
-    .empty-state,
-    .loading-state,
-    .error-state {
+    .pantry-list :global(.empty-state),
+    .pantry-list :global(.loading-state),
+    .pantry-list :global(.error-state) {
         padding: 2rem;
         text-align: center;
         color: #718096;
