@@ -1,0 +1,136 @@
+---
+
+---
+
+<form id="pantry-form" class="pantry-form">
+    <h3>Add Item</h3>
+    <div class="form-grid">
+        <div class="field">
+            <label for="item-name">Item Name *</label>
+            <input
+                type="text"
+                id="item-name"
+                required
+                placeholder="e.g. Milk"
+            />
+        </div>
+
+        <div class="field">
+            <label for="item-quantity">Quantity</label>
+            <input type="text" id="item-quantity" placeholder="e.g. 1L" />
+        </div>
+
+        <div class="field">
+            <label for="item-expiry">Expires</label>
+            <input type="date" id="item-expiry" />
+        </div>
+
+        <button type="submit" class="add-btn">
+            <span>Add to Pantry</span>
+        </button>
+    </div>
+</form>
+
+<script>
+    import { supabase } from "../lib/supabaseClient";
+
+    const form = document.getElementById("pantry-form") as HTMLFormElement;
+    const nameInput = document.getElementById("item-name") as HTMLInputElement;
+    const quantityInput = document.getElementById(
+        "item-quantity",
+    ) as HTMLInputElement;
+    const expiryInput = document.getElementById(
+        "item-expiry",
+    ) as HTMLInputElement;
+
+    form.addEventListener("submit", async (e) => {
+        e.preventDefault();
+        if (!nameInput.value) return;
+
+        const {
+            data: { user },
+        } = await supabase.auth.getUser();
+        if (!user) {
+            alert("Please log in first");
+            return;
+        }
+
+        const newItem = {
+            user_id: user.id,
+            name: nameInput.value,
+            quantity: quantityInput.value || null,
+            expiration_date: expiryInput.value || null,
+        };
+
+        const { error } = await supabase.from("pantry_items").insert([newItem]);
+
+        if (error) {
+            alert("Error adding item: " + error.message);
+        } else {
+            form.reset();
+            // Dispatch custom event so List component can refresh
+            window.dispatchEvent(new CustomEvent("pantry-updated"));
+        }
+    });
+</script>
+
+<style>
+    .pantry-form {
+        background: rgba(255, 255, 255, 0.03);
+        border: 1px solid rgba(255, 255, 255, 0.05);
+        padding: 1.5rem;
+        border-radius: 12px;
+        margin-bottom: 2rem;
+    }
+
+    h3 {
+        margin-top: 0;
+        margin-bottom: 1rem;
+        color: #e0e0e0;
+    }
+
+    .form-grid {
+        display: grid;
+        gap: 1rem;
+    }
+
+    .field label {
+        display: block;
+        font-size: 0.8rem;
+        color: #888;
+        margin-bottom: 0.3rem;
+    }
+
+    input {
+        width: 100%;
+        padding: 0.6rem;
+        background: rgba(0, 0, 0, 0.3);
+        border: 1px solid rgba(255, 255, 255, 0.1);
+        border-radius: 6px;
+        color: white;
+        font-family: inherit;
+        box-sizing: border-box;
+    }
+
+    input:focus {
+        outline: none;
+        border-color: #646cff;
+    }
+
+    .add-btn {
+        margin-top: 0.5rem;
+        padding: 0.75rem;
+        background: #646cff; /* Fallback */
+        background: linear-gradient(45deg, #646cff, #9966cc);
+        border: none;
+        border-radius: 6px;
+        color: white;
+        font-weight: 600;
+        cursor: pointer;
+        transition: filter 0.2s;
+    }
+
+    .add-btn:hover {
+        filter: brightness(1.2);
+    }
+</style>

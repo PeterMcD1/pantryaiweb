@@ -1,11 +1,104 @@
 ---
-import Welcome from '../components/Welcome.astro';
-import Layout from '../layouts/Layout.astro';
-
-// Welcome to Astro! Wondering what to do next? Check out the Astro documentation at https://docs.astro.build
-// Don't want to use any of this? Delete everything in this file, the `assets`, `components`, and `layouts` directories, and start fresh.
+import Layout from "../layouts/Layout.astro";
+import Auth from "../components/Auth.astro";
+import PantryDashboard from "../components/PantryDashboard.astro";
 ---
 
-<Layout>
-	<Welcome />
+<Layout title="Pantry AI">
+	<main id="app-root">
+		<div id="loading" class="loading">
+			<div class="spinner"></div>
+		</div>
+		<div id="auth-view" class="hidden">
+			<div class="hero">
+				<h1>Pantry <span class="text-gradient">AI</span></h1>
+				<p class="subtitle">
+					Smart inventory management & recipe generation
+				</p>
+			</div>
+			<Auth />
+		</div>
+		<div id="dashboard-view" class="hidden">
+			<PantryDashboard />
+		</div>
+	</main>
 </Layout>
+
+<script>
+	import { supabase } from "../lib/supabaseClient";
+
+	const loading = document.getElementById("loading");
+	const authView = document.getElementById("auth-view");
+	const dashboardView = document.getElementById("dashboard-view");
+
+	supabase.auth.onAuthStateChange((event, session) => {
+		loading?.classList.add("hidden");
+		if (session) {
+			authView?.classList.add("hidden");
+			dashboardView?.classList.remove("hidden");
+		} else {
+			dashboardView?.classList.add("hidden");
+			authView?.classList.remove("hidden");
+		}
+	});
+</script>
+
+<style>
+	main {
+		min-height: 100vh;
+		background: #13151a;
+		color: white;
+		font-family: "Inter", system-ui, sans-serif;
+	}
+
+	.hidden {
+		display: none !important;
+	}
+
+	.loading {
+		display: flex;
+		justify-content: center;
+		align-items: center;
+		height: 100vh;
+	}
+
+	.spinner {
+		width: 50px;
+		height: 50px;
+		border: 3px solid rgba(255, 255, 255, 0.3);
+		border-radius: 50%;
+		border-top-color: #fff;
+		animation: spin 1s ease-in-out infinite;
+	}
+
+	@keyframes spin {
+		to {
+			transform: rotate(360deg);
+		}
+	}
+
+	.hero {
+		text-align: center;
+		padding-top: 4rem;
+	}
+
+	h1 {
+		font-size: 4rem;
+		font-weight: 800;
+		margin: 0;
+	}
+
+	.text-gradient {
+		background-image: var(--accent-gradient);
+		-webkit-background-clip: text;
+		-webkit-text-fill-color: transparent;
+		background-size: 400%;
+		background-position: 0%;
+	}
+
+	.subtitle {
+		font-size: 1.25rem;
+		color: #888;
+		margin-top: 0.5rem;
+	}
+</style>

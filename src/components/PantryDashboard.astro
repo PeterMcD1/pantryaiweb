@@ -1,0 +1,89 @@
+---
+import PantryForm from "./PantryForm.astro";
+import PantryList from "./PantryList.astro";
+import RecipeGenerator from "./RecipeGenerator.astro"; // Will create next
+---
+
+<div class="dashboard">
+    <header>
+        <h1>Your Pantry</h1>
+        <button id="sign-out-btn">Sign Out</button>
+    </header>
+
+    <main>
+        <section class="pantry-manager">
+            <PantryForm />
+            <PantryList />
+        </section>
+
+        <aside class="recipe-generator-section">
+            <RecipeGenerator />
+        </aside>
+    </main>
+</div>
+
+<script>
+    import { supabase } from "../lib/supabaseClient";
+
+    document
+        .getElementById("sign-out-btn")
+        ?.addEventListener("click", async () => {
+            await supabase.auth.signOut();
+            window.location.reload();
+        });
+</script>
+
+<style>
+    .dashboard {
+        max-width: 1200px;
+        margin: 0 auto;
+        padding: 2rem;
+        color: white;
+    }
+
+    header {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        margin-bottom: 3rem;
+        border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+        padding-bottom: 1rem;
+    }
+
+    h1 {
+        font-size: 2.5rem;
+        font-weight: 700;
+        margin: 0;
+        background: linear-gradient(to right, #00f2fe, #4facfe);
+        -webkit-background-clip: text;
+        -webkit-text-fill-color: transparent;
+    }
+
+    button {
+        background: transparent;
+        border: 1px solid rgba(255, 255, 255, 0.3);
+        color: white;
+        padding: 0.5rem 1rem;
+        border-radius: 6px;
+        cursor: pointer;
+        transition: all 0.2s;
+    }
+
+    button:hover {
+        background: rgba(255, 255, 255, 0.1);
+        border-color: white;
+    }
+
+    main {
+        display: grid;
+        grid-template-columns: 1fr 1fr;
+        gap: 3rem;
+        align-items: start;
+    }
+
+    @media (max-width: 900px) {
+        main {
+            grid-template-columns: 1fr;
+        }
+    }
+</style>

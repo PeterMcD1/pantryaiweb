@@ -1,0 +1,217 @@
+---
+
+---
+
+<div id="auth-container" class="auth-container">
+    <div class="auth-box">
+        <h2 id="auth-title">Welcome Back</h2>
+        <p id="auth-subtitle">Sign in to manage your pantry</p>
+
+        <form id="auth-form">
+            <div class="input-group">
+                <label for="email">Email</label>
+                <input
+                    type="email"
+                    id="email"
+                    name="email"
+                    required
+                    placeholder="your@email.com"
+                />
+            </div>
+
+            <div class="input-group">
+                <label for="password">Password</label>
+                <input
+                    type="password"
+                    id="password"
+                    name="password"
+                    required
+                    placeholder="••••••••"
+                />
+            </div>
+
+            <button type="submit" id="submit-btn">Sign In</button>
+        </form>
+
+        <p class="toggle-text">
+            <span id="toggle-msg">Don't have an account?</span>
+            <button id="toggle-btn" type="button">Sign Up</button>
+        </p>
+        <p id="error-msg" class="error-msg"></p>
+    </div>
+</div>
+
+<script>
+    import { supabase } from "../lib/supabaseClient";
+
+    const form = document.getElementById("auth-form") as HTMLFormElement;
+    const emailInput = document.getElementById("email") as HTMLInputElement;
+    const passwordInput = document.getElementById(
+        "password",
+    ) as HTMLInputElement;
+    const submitBtn = document.getElementById(
+        "submit-btn",
+    ) as HTMLButtonElement;
+    const toggleBtn = document.getElementById(
+        "toggle-btn",
+    ) as HTMLButtonElement;
+    const authTitle = document.getElementById("auth-title") as HTMLElement;
+    const authSubtitle = document.getElementById(
+        "auth-subtitle",
+    ) as HTMLElement;
+    const toggleMsg = document.getElementById("toggle-msg") as HTMLElement;
+    const errorMsg = document.getElementById("error-msg") as HTMLElement;
+
+    let isLogin = true;
+
+    toggleBtn.addEventListener("click", () => {
+        isLogin = !isLogin;
+        if (isLogin) {
+            authTitle.textContent = "Welcome Back";
+            authSubtitle.textContent = "Sign in to manage your pantry";
+            submitBtn.textContent = "Sign In";
+            toggleMsg.textContent = "Don't have an account?";
+            toggleBtn.textContent = "Sign Up";
+        } else {
+            authTitle.textContent = "Create Account";
+            authSubtitle.textContent = "Start tracking your pantry today";
+            submitBtn.textContent = "Sign Up";
+            toggleMsg.textContent = "Already have an account?";
+            toggleBtn.textContent = "Sign In";
+        }
+        errorMsg.textContent = "";
+    });
+
+    form.addEventListener("submit", async (e) => {
+        e.preventDefault();
+        const email = emailInput.value;
+        const password = passwordInput.value;
+        errorMsg.textContent = "";
+
+        try {
+            if (isLogin) {
+                const { error } = await supabase.auth.signInWithPassword({
+                    email,
+                    password,
+                });
+                if (error) throw error;
+            } else {
+                const { error } = await supabase.auth.signUp({
+                    email,
+                    password,
+                });
+                if (error) throw error;
+                alert("Check your email for the confirmation link!");
+            }
+            // Reload to update state
+            window.location.reload();
+        } catch (error: any) {
+            errorMsg.textContent = error.message;
+        }
+    });
+</script>
+
+<style>
+    .auth-container {
+        display: flex;
+        justify-content: center;
+        align-items: center;
+        min-height: 50vh;
+        padding: 2rem;
+    }
+
+    .auth-box {
+        background: rgba(255, 255, 255, 0.05);
+        backdrop-filter: blur(10px);
+        padding: 2.5rem;
+        border-radius: 16px;
+        border: 1px solid rgba(255, 255, 255, 0.1);
+        box-shadow: 0 4px 30px rgba(0, 0, 0, 0.1);
+        width: 100%;
+        max-width: 400px;
+        color: white;
+    }
+
+    h2 {
+        margin: 0;
+        font-size: 1.8rem;
+        font-weight: 700;
+        background: linear-gradient(to right, #a8c0ff, #3f2b96);
+        -webkit-background-clip: text;
+        -webkit-text-fill-color: transparent;
+    }
+
+    p {
+        margin-top: 0.5rem;
+        color: #a0a0a0;
+    }
+
+    .input-group {
+        margin-bottom: 1.5rem;
+        text-align: left;
+    }
+
+    label {
+        display: block;
+        margin-bottom: 0.5rem;
+        font-size: 0.9rem;
+        color: #ccc;
+    }
+
+    input {
+        width: 100%;
+        padding: 0.75rem;
+        border-radius: 8px;
+        border: 1px solid rgba(255, 255, 255, 0.2);
+        background: rgba(0, 0, 0, 0.2);
+        color: white;
+        font-size: 1rem;
+        transition: border-color 0.3s ease;
+    }
+
+    input:focus {
+        outline: none;
+        border-color: #a8c0ff;
+    }
+
+    button[type="submit"] {
+        width: 100%;
+        padding: 0.75rem;
+        background: linear-gradient(to right, #4facfe, #00f2fe);
+        border: none;
+        border-radius: 8px;
+        color: white;
+        font-size: 1rem;
+        font-weight: 600;
+        cursor: pointer;
+        transition:
+            transform 0.2s ease,
+            box-shadow 0.2s ease;
+    }
+
+    button[type="submit"]:hover {
+        transform: translateY(-2px);
+        box-shadow: 0 4px 15px rgba(79, 172, 254, 0.4);
+    }
+
+    .toggle-text {
+        margin-top: 1.5rem;
+        font-size: 0.9rem;
+    }
+
+    #toggle-btn {
+        background: none;
+        border: none;
+        color: #4facfe;
+        cursor: pointer;
+        text-decoration: underline;
+        font-weight: 600;
+    }
+
+    .error-msg {
+        color: #ff6b6b;
+        font-size: 0.9rem;
+        margin-top: 1rem;
+        min-height: 1.2em;
+    }
+</style>

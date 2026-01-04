@@ -1,0 +1,231 @@
+---
+
+---
+
+<div class="pantry-list-container">
+    <h3>Current Inventory</h3>
+    <ul id="pantry-list" class="pantry-list">
+        <li class="loading-state">Loading items...</li>
+    </ul>
+</div>
+
+<script>
+    import { supabase } from "../lib/supabaseClient";
+
+    const listElement = document.getElementById("pantry-list");
+    let items = [];
+
+    async function fetchItems() {
+        listElement!.innerHTML = '<li class="loading-state">Loading...</li>';
+        const {
+            data: { user },
+        } = await supabase.auth.getUser();
+        if (!user) return;
+
+        const { data, error } = await supabase
+            .from("pantry_items")
+            .select("*")
+            .order("created_at", { ascending: false });
+
+        if (error) {
+            console.error("Error fetching pantry:", error);
+            listElement!.innerHTML =
+                '<li class="error-state">Failed to load items</li>';
+        } else {
+            items = data || [];
+            renderItems();
+        }
+    }
+
+    function renderItems() {
+        if (!listElement) return;
+        if (items.length === 0) {
+            listElement.innerHTML =
+                '<li class="empty-state">Your pantry is empty. Add items above!</li>';
+            return;
+        }
+
+        listElement.innerHTML = items
+            .map(
+                (item) => `
+      <li class="pantry-item" data-id="${item.id}">
+        <div class="item-info">
+          <span class="item-name">${escapeHtml(item.name)}</span>
+          <div class="item-details">
+            ${item.quantity ? `<span class="tag qty">${escapeHtml(item.quantity)}</span>` : ""}
+            ${item.expiration_date ? `<span class="tag date ${getExpiryClass(item.expiration_date)}">${formatDate(item.expiration_date)}</span>` : ""}
+          </div>
+        </div>
+        <button class="delete-btn" aria-label="Delete item">
+          <svg viewBox="0 0 24 24" width="18" height="18" stroke="currentColor" stroke-width="2" fill="none" stroke-linecap="round" stroke-linejoin="round"><polyline points="3 6 5 6 21 6"></polyline><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"></path></svg>
+        </button>
+      </li>
+    `,
+            )
+            .join("");
+
+        // Attach listeners
+        document.querySelectorAll(".delete-btn").forEach((btn) => {
+            btn.addEventListener("click", handleDelete);
+        });
+    }
+
+    async function handleDelete(e: Event) {
+        const btn = (e.target as HTMLElement).closest(".delete-btn");
+        const li = btn?.closest(".pantry-item");
+        const id = li?.getAttribute("data-id");
+        if (!id) return;
+
+        // Optimistic update
+        li?.remove();
+
+        const { error } = await supabase
+            .from("pantry_items")
+            .delete()
+            .eq("id", id);
+
+        if (error) {
+            console.error("Error deleting:", error);
+            // Re-fetch if failed
+            fetchItems();
+        }
+    }
+
+    function escapeHtml(text: string) {
+        const div = document.createElement("div");
+        div.textContent = text;
+        return div.innerHTML;
+    }
+
+    function formatDate(dateStr: string) {
+        return new Date(dateStr).toLocaleDateString();
+    }
+
+    function getExpiryClass(dateStr: string) {
+        const days =
+            (new Date(dateStr).getTime() - Date.now()) / (1000 * 3600 * 24);
+        if (days < 0) return "expired";
+        if (days < 3) return "urgent";
+        return "ok";
+    }
+
+    // Initial load
+    fetchItems();
+
+    // Listen for updates
+    window.addEventListener("pantry-updated", fetchItems);
+</script>
+
+<style>
+    .pantry-list-container {
+        background: rgba(255, 255, 255, 0.03);
+        border-radius: 12px;
+        overflow: hidden;
+    }
+
+    h3 {
+        margin: 0;
+        padding: 1rem 1.5rem;
+        background: rgba(255, 255, 255, 0.02);
+        border-bottom: 1px solid rgba(255, 255, 255, 0.05);
+        font-size: 1rem;
+        color: #a0aec0;
+    }
+
+    .pantry-list {
+        list-style: none;
+        margin: 0;
+        padding: 0;
+        max-height: 500px;
+        overflow-y: auto;
+    }
+
+    .pantry-item {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        padding: 1rem 1.5rem;
+        border-bottom: 1px solid rgba(255, 255, 255, 0.05);
+        transition: background 0.2s;
+        animation: fadeIn 0.3s ease;
+    }
+
+    @keyframes fadeIn {
+        from {
+            opacity: 0;
+            transform: translateY(5px);
+        }
+        to {
+            opacity: 1;
+            transform: translateY(0);
+        }
+    }
+
+    .pantry-item:hover {
+        background: rgba(255, 255, 255, 0.03);
+    }
+
+    .item-name {
+        font-weight: 500;
+        font-size: 1.1rem;
+        display: block;
+        margin-bottom: 0.25rem;
+    }
+
+    .item-details {
+        display: flex;
+        gap: 0.5rem;
+        font-size: 0.85rem;
+    }
+
+    .tag {
+        padding: 0.1rem 0.5rem;
+        border-radius: 4px;
+        background: rgba(255, 255, 255, 0.1);
+        color: #ccc;
+    }
+
+    .tag.qty {
+        background: #2d3748;
+        color: #a0aec0;
+    }
+
+    .tag.date.urgent {
+        background: rgba(237, 137, 54, 0.2);
+        color: #ed8936;
+    }
+
+    .tag.date.expired {
+        background: rgba(245, 101, 101, 0.2);
+        color: #f56565;
+    }
+
+    .tag.date.ok {
+        background: rgba(72, 187, 120, 0.2);
+        color: #48bb78;
+    }
+
+    .delete-btn {
+        background: none;
+        border: none;
+        color: #718096;
+        cursor: pointer;
+        padding: 0.5rem;
+        border-radius: 6px;
+        transition: all 0.2s;
+    }
+
+    .delete-btn:hover {
+        color: #f56565;
+        background: rgba(245, 101, 101, 0.1);
+    }
+
+    .empty-state,
+    .loading-state,
+    .error-state {
+        padding: 2rem;
+        text-align: center;
+        color: #718096;
+        font-style: italic;
+    }
+</style>

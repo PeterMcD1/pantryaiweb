@@ -1,0 +1,268 @@
+---
+
+---
+
+<div class="generator-container">
+    <div class="header">
+        <h2>Recipe AI</h2>
+        <p>
+            Generate recipes from your pantry items using Anthropic Claude 3.5
+            Sonnet.
+        </p>
+    </div>
+
+    <button id="generate-btn" class="generate-btn">
+        <span class="btn-text">Generate Recipes</span>
+        <span id="loader" class="loader hidden"></span>
+    </button>
+
+    <div id="recipe-output" class="recipe-output hidden"></div>
+</div>
+
+<script>
+    import { marked } from "marked"; // We need a markdown parser for nice display
+    import { supabase } from "../lib/supabaseClient";
+
+    const generateBtn = document.getElementById(
+        "generate-btn",
+    ) as HTMLButtonElement;
+    const btnText = document.querySelector(".btn-text") as HTMLElement;
+    const loader = document.getElementById("loader") as HTMLElement;
+    const output = document.getElementById("recipe-output") as HTMLElement;
+
+    generateBtn.addEventListener("click", async () => {
+        // 1. Get current pantry items
+        setLoading(true);
+        output.innerHTML = "";
+        output.classList.add("hidden");
+        output.classList.remove("error-msg"); // Clear previous error styles
+
+        try {
+            const {
+                data: { user },
+            } = await supabase.auth.getUser();
+            if (!user) throw new Error("Not logged in");
+
+            const { data: items, error } = await supabase
+                .from("pantry_items")
+                .select("name, quantity, expiration_date");
+
+            if (error) throw error;
+            if (!items || items.length === 0) {
+                alert("Your pantry is empty! Add items first.");
+                setLoading(false);
+                return;
+            }
+
+            // 2. Call API
+            console.log("Client: Sending request to /api/generate-recipes");
+            let response;
+            try {
+                response = await fetch("/api/generate-recipes", {
+                    method: "POST",
+                    headers: {
+                        "Content-Type": "application/json",
+                    },
+                    body: JSON.stringify({ items }),
+                });
+            } catch (netErr) {
+                console.error("Client: Network Error calling API:", netErr);
+                throw new Error("Network error calling API");
+            }
+
+            console.log("Client: Response received. Status:", response.status);
+
+            if (!response.ok) {
+                let errorMsg = "Failed to generate recipes";
+                try {
+                    const errorData = await response.json();
+                    errorMsg = errorData.error || errorMsg;
+                } catch (e) {
+                    // If response isn't JSON, try to get text
+                    try {
+                        const rawText = await response.text();
+                        if (rawText)
+                            errorMsg += `: ${rawText.substring(0, 150)}`;
+                    } catch (txtErr) {
+                        // ignore
+                    }
+                }
+                throw new Error(errorMsg);
+            }
+
+            if (!response.body)
+                throw new Error("No response body received from server");
+
+            output.classList.remove("hidden");
+            const reader = response.body.getReader();
+            const decoder = new TextDecoder();
+            let markdownText = "";
+            console.log("Client: Starting to read stream");
+
+            while (true) {
+                const { done, value } = await reader.read();
+                if (done) {
+                    console.log("Client: Stream done");
+                    break;
+                }
+
+                const chunk = decoder.decode(value, { stream: true });
+                console.log("Client: Chunk received (len):", chunk.length);
+                markdownText += chunk;
+
+                // Render markdown
+                output.innerHTML = parseMarkdown(markdownText);
+            }
+        } catch (err: any) {
+            console.error("Recipe generation error:", err);
+            output.classList.remove("hidden");
+            output.classList.add("error-msg");
+            output.innerHTML = `<div class="error-content">
+        <strong>Error:</strong> ${err.message || "Something went wrong while generating recipes."}
+        <br/><br/>
+        Please check your network connection and API keys.
+      </div>`;
+        } finally {
+            setLoading(false);
+        }
+    });
+
+    function setLoading(isLoading: boolean) {
+        if (isLoading) {
+            generateBtn.disabled = true;
+            btnText.textContent = "Generating...";
+            loader.classList.remove("hidden");
+        } else {
+            generateBtn.disabled = false;
+            btnText.textContent = "Generate Recipes";
+            loader.classList.add("hidden");
+        }
+    }
+
+    // Simple Markdown parser to avoid heavy dependency if strict performance is key
+    // But user said "super performative", a 20kb lib is usually fine.
+    // For now, I'll use a very basic replacement or assume I can install 'marked'
+    // I will assume I need to install 'marked'
+    function parseMarkdown(text: string) {
+        // @ts-ignore
+        if (typeof window.marked !== "undefined")
+            return window.marked.parse(text);
+
+        // Fallback simple formatter
+        return text
+            .replace(/\n/g, "<br>")
+            .replace(/\*\*(.*?)\*\*/g, "<strong>$1</strong>")
+            .replace(/# (.*?)(<br>|$)/g, "<h1>$1</h1>")
+            .replace(/## (.*?)(<br>|$)/g, "<h2>$1</h2>");
+    }
+</script>
+
+<script>
+    // Dynamically load marked for client-side rendering
+    const script = document.createElement("script");
+    script.src = "https://cdn.jsdelivr.net/npm/marked/marked.min.js";
+    document.head.appendChild(script);
+</script>
+
+<style>
+    .generator-container {
+        background:
+            radial-gradient(
+                circle at top right,
+                rgba(100, 108, 255, 0.1),
+                transparent 40%
+            ),
+            rgba(30, 30, 35, 0.6);
+        border: 1px solid rgba(255, 255, 255, 0.1);
+        padding: 2rem;
+        border-radius: 16px;
+        /* min-height: 400px; */
+        position: sticky;
+        top: 2rem;
+    }
+
+    h2 {
+        margin-top: 0;
+        font-size: 1.8rem;
+        background: linear-gradient(to right, #ffafbd, #ffc3a0);
+        -webkit-background-clip: text;
+        -webkit-text-fill-color: transparent;
+    }
+
+    p {
+        color: #a0a0a0;
+        margin-bottom: 2rem;
+    }
+
+    .generate-btn {
+        width: 100%;
+        padding: 1rem;
+        background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+        color: white;
+        border: none;
+        border-radius: 8px;
+        font-weight: 700;
+        font-size: 1.1rem;
+        cursor: pointer;
+        transition: all 0.2s;
+        display: flex;
+        justify-content: center;
+        align-items: center;
+        gap: 10px;
+    }
+
+    .generate-btn:hover:not(:disabled) {
+        transform: translateY(-2px);
+        box-shadow: 0 5px 15px rgba(118, 75, 162, 0.4);
+    }
+
+    .generate-btn:disabled {
+        opacity: 0.7;
+        cursor: not-allowed;
+    }
+
+    .loader {
+        width: 20px;
+        height: 20px;
+        border: 3px solid rgba(255, 255, 255, 0.3);
+        border-radius: 50%;
+        border-top-color: white;
+        animation: spin 1s linear infinite;
+    }
+
+    .recipe-output {
+        margin-top: 2rem;
+        padding-top: 2rem;
+        border-top: 1px solid rgba(255, 255, 255, 0.1);
+        line-height: 1.6;
+        color: #e0e0e0;
+    }
+
+    /* Markdown Styles */
+    .recipe-output :global(h1),
+    .recipe-output :global(h2) {
+        color: white;
+        margin-top: 1.5rem;
+    }
+    .recipe-output :global(ul) {
+        padding-left: 1.5rem;
+    }
+    .recipe-output :global(li) {
+        margin-bottom: 0.5rem;
+    }
+    .recipe-output :global(strong) {
+        color: #ffd700;
+    }
+
+    .recipe-output.error-msg {
+        color: #ff6b6b;
+        border-top-color: #ff6b6b;
+    }
+
+    .error-content {
+        background: rgba(255, 0, 0, 0.1);
+        padding: 1rem;
+        border-radius: 8px;
+        border: 1px solid rgba(255, 0, 0, 0.2);
+    }
+</style>
