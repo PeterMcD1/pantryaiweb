@@ -54,10 +54,10 @@ export const POST: APIRoute = async ({ request }) => {
   `;
 
     try {
-        console.log('API: Calling Anthropic Claude Sonnet 3.5...');
+        console.log('API: Calling Anthropic Claude Haiku 4.5...');
 
         const stream = await anthropic.messages.create({
-            model: "claude-sonnet-4-5",
+            model: "claude-haiku-4-5",
             max_tokens: 2048,
             messages: [{ role: "user", content: prompt }],
             stream: true,
